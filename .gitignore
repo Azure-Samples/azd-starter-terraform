@@ -13,3 +13,31 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+*.dll
+*.exe
+*.pdb
+*.cache
+project.lock.json
+/packages/
+
+# Azure Functions
+local.settings.json
+appsettings.Development.json
+
+# IDE
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db

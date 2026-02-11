@@ -1,6 +1,46 @@
-# Azure Developer CLI (azd) Terraform Starter
+# Azure Developer CLI (azd) Terraform Starter - Flex Consumption Function
 
-A starter blueprint for getting your application up on Azure using [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview) (azd). Add your application code, write Infrastructure as Code assets in Terraform to get your application up and running quickly.
+A starter blueprint for deploying **Azure Functions with Flex Consumption** using [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview) (azd) and **Terraform**. This template demonstrates modern infrastructure patterns with AzureRM Provider 4.x.
+
+**Migrated from**: [functions-quickstart-dotnet-azd](https://github.com/Azure-Samples/functions-quickstart-dotnet-azd) (Bicep → Terraform)
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Resource Group (rg-{environment})                               │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌──────────────────┐  ┌──────────────────┐                    │
+│  │ User Assigned    │  │ Storage Account  │                    │
+│  │ Managed Identity │  │ (deployment pkg) │                    │
+│  └────────┬─────────┘  └────────┬─────────┘                    │
+│           │                     │                               │
+│           ▼                     ▼                               │
+│  ┌─────────────────────────────────────────────────────┐       │
+│  │ Function App (Flex Consumption - FC1 SKU)           │       │
+│  │ - .NET 10 isolated worker                           │       │
+│  │ - HTTP Trigger (httpget)                            │       │
+│  └─────────────────────────────────────────────────────┘       │
+│           │                                                     │
+│           ▼                                                     │
+│  ┌──────────────────┐  ┌──────────────────┐                    │
+│  │ Log Analytics    │◄─│ Application      │                    │
+│  │ Workspace        │  │ Insights (AAD)   │                    │
+│  └──────────────────┘  └──────────────────┘                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## What's Deployed
+
+| Resource | Description |
+|----------|-------------|
+| Resource Group | Container for all resources |
+| User Assigned Managed Identity | Passwordless authentication |
+| Storage Account | Blob container for function deployment packages |
+| Log Analytics Workspace | Centralized logging |
+| Application Insights | APM with local auth disabled |
+| App Service Plan (FC1) | Flex Consumption hosting plan |
+| Function App | .NET 10 isolated HTTP trigger function |
 
 ## Prerequisites
 
@@ -21,7 +61,16 @@ A starter blueprint for getting your application up on Azure using [Azure Develo
    sudo apt update && sudo apt install terraform
    ```
 
-2. **Azure CLI**
+2. **.NET 10 SDK** (for building the function)
+   ```bash
+   # macOS
+   brew install dotnet@10
+   
+   # Windows
+   winget install Microsoft.DotNet.SDK.10
+   ```
+
+3. **Azure CLI**
    ```bash
    # macOS
    brew install azure-cli
@@ -33,7 +82,7 @@ A starter blueprint for getting your application up on Azure using [Azure Develo
    curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
    ```
 
-3. **Azure Developer CLI (azd)**
+4. **Azure Developer CLI (azd)**
    ```bash
    # macOS
    brew install azure-dev
@@ -76,116 +125,132 @@ For full migration guide, see: [AzureRM 4.0 Upgrade Guide](https://github.com/ha
 
 ## Documentation References
 
+- [Azure Functions Flex Consumption](https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan)
+- [azurerm_function_app_flex_consumption](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/function_app_flex_consumption)
 - [Azure Developer CLI Overview](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview)
-- [AZD Schema Reference](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/azd-schema)
 - [Terraform AzureRM Provider Docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-- [AzureRM 4.x Version History](https://learn.microsoft.com/en-us/azure/developer/terraform/provider-version-history-azurerm-4-0-0-to-current)
-- [Terraform Style Guide](https://developer.hashicorp.com/terraform/language/style)
+- [AzureRM 4.x Upgrade Guide](https://github.com/hashicorp/terraform-provider-azurerm/blob/main/website/docs/guides/4.0-upgrade-guide.html.markdown)
 
 ## Project Structure
 
 ```
 ├── azure.yaml              # AZD project configuration
+├── http/                   # Function app source code
+│   ├── http.csproj         # .NET 10 project file
+│   ├── Program.cs          # Host configuration
+│   ├── httpGetFunction.cs  # HTTP trigger function
+│   └── host.json           # Function host settings
 ├── infra/
 │   ├── provider.tf         # Provider configuration (azurerm ~>4.21)
-│   ├── main.tf             # Main infrastructure
+│   ├── main.tf             # All infrastructure resources
 │   ├── variables.tf        # Input variables
-│   ├── output.tf           # Output values
-│   └── core/               # Reusable modules
-│       ├── database/       # CosmosDB, PostgreSQL
-│       ├── gateway/        # API Management
-│       ├── host/           # App Service, App Service Plans
-│       ├── monitor/        # Application Insights, Log Analytics
-│       └── security/       # Key Vault
+│   └── output.tf           # Output values (for AZD)
 └── .devcontainer/          # Dev container with tools pre-installed
 ```
 
 The following assets have been provided:
 
-- Infrastructure-as-code (IaC) Terraform modules under the `infra` directory that demonstrate how to provision resources and setup resource tagging for azd.
-- A [dev container](https://containers.dev) configuration file under the `.devcontainer` directory that installs infrastructure tooling by default. This can be readily used to create cloud-hosted developer environments such as [GitHub Codespaces](https://aka.ms/codespaces).
-- Continuous deployment workflows for CI providers such as GitHub Actions under the `.github` directory, and Azure Pipelines under the `.azdo` directory that work for most use-cases.
+- **Function App Code** in `http/` - A .NET 10 isolated worker HTTP trigger function
+- **Infrastructure-as-code** in `infra/` - Terraform configuration for Flex Consumption Function App
+- **Dev Container** in `.devcontainer/` - Pre-configured development environment
 
 ## Quick Start
 
 ```bash
-# Initialize azd environment
-azd init
+# Login to Azure
+az login
+az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
 
-# Validate Terraform configuration
-cd infra && terraform init && terraform validate && cd ..
-
-# Provision Azure resources
-azd provision
-
-# Deploy application (if services configured)
-azd deploy
-
-# Or do both at once
+# Deploy everything with AZD
 azd up
+
+# Or step-by-step:
+azd provision  # Create infrastructure
+azd deploy     # Deploy function code
 ```
 
-## Next Steps
+## Test the Function
 
-### Step 1: Add application code
+After deployment, test your function:
 
-1. Initialize the service source code projects anywhere under the current directory. Ensure that all source code projects can be built successfully.
-    - > Note: For `function` services, it is recommended to initialize the project using the provided [quickstart tools](https://learn.microsoft.com/en-us/azure/azure-functions/functions-get-started).
-2. Once all service source code projects are building correctly, update `azure.yaml` to reference the source code projects.
-3. Run `azd package` to validate that all service source code projects can be built and packaged locally.
+```bash
+# Get the function URL
+azd env get-values | grep AZURE_FUNCTION_NAME
 
-### Step 2: Provision Azure resources
+# Test the HTTP endpoint
+curl "https://<function-name>.azurewebsites.net/api/httpget?name=World"
+```
 
-Update or add Terraform modules to provision the relevant Azure resources. This can be done incrementally, as the list of [Azure resources](https://learn.microsoft.com/en-us/azure/?product=popular) are explored and added.
+## Key Features
 
-- All Azure resources available in Terraform format can be found [here](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs).
+### Flex Consumption Plan
+- **Automatic scaling** from 0 to 100 instances
+- **VNet integration** support (optional)
+- **Instance memory**: 2048 MB
+- **Pay-per-use** billing
 
-Run `azd provision` whenever you want to ensure that changes made are applied correctly and work as expected.
+### Managed Identity Authentication
+- User Assigned Managed Identity for all Azure access
+- No connection strings or access keys
+- RBAC roles: Storage Blob Data Owner, Monitoring Metrics Publisher
 
-### Step 3: Tie in application and infrastructure
+### Application Insights
+- Local authentication disabled (AAD only)
+- Connected to Log Analytics workspace
+- Automatic telemetry collection
 
-Certain changes to Terraform modules or deployment manifests are required to tie in application and infrastructure together. For example:
+## Customization
 
-1. Set up [application settings](#application-settings) for the code running in Azure to connect to other Azure resources.
-1. If you are accessing sensitive resources in Azure, set up [managed identities](#managed-identities) to allow the code running in Azure to securely access the resources.
-1. If you have secrets, it is recommended to store secrets in [Azure Key Vault](#azure-key-vault) that then can be retrieved by your application, with the use of managed identities.
-1. Configure [host configuration](#host-configuration) on your hosting platform to match your application's needs. This may include networking options, security options, or more advanced configuration that helps you take full advantage of Azure capabilities.
+### Change Runtime
 
-For more details, see [additional details](#additional-details) below.
+Edit `infra/main.tf`:
+```hcl
+runtime_name    = "node"      # or "python", "java", "dotnet-isolated"
+runtime_version = "20"        # version appropriate for runtime
+```
 
-When changes are made, use azd to apply your changes in Azure and validate that they are working as expected:
+### Adjust Scaling
 
-- Run `azd up` to validate both infrastructure and application code changes.
-- Run `azd deploy` to validate application code changes.
+```hcl
+maximum_instance_count = 100  # Max instances
+instance_memory_in_mb  = 2048 # Memory per instance
+```
 
-### Step 4: Up to Azure
+### Enable VNet Integration
 
-Finally, run `azd up` to run the end-to-end infrastructure provisioning (`azd provision`) and deployment (`azd deploy`) flow. Visit the service endpoints listed to see your application up-and-running!
+VNet integration is not enabled by default. To add it, you would need to:
+1. Create a Virtual Network and subnet
+2. Add `virtual_network_subnet_id` to the function app resource
 
 ## Additional Details
 
-The following section examines different concepts that help tie in application and infrastructure.
+### Managed Identities
 
-### Application settings
+This template uses a **User Assigned Managed Identity** for passwordless authentication to Azure services:
 
-It is recommended to have application settings managed in Azure, separating configuration from code. Typically, the service host allows for application settings to be defined.
-
-- For `appservice` and `function`, application settings should be defined on the Terraform resource for the targeted host. Reference template example [here](https://github.com/Azure-Samples/todo-nodejs-mongo-terraform/tree/main/infra).
-- For `aks`, application settings are applied using deployment manifests under the `<service>/manifests` folder. Reference template example [here](https://github.com/Azure-Samples/todo-nodejs-mongo-aks/tree/main/src/api/manifests).
-
-### Managed identities
-
-[Managed identities](https://learn.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview) allows you to secure communication between services. This is done without having the need for you to manage any credentials.
+- **Storage Account**: Storage Blob Data Owner role for deployment packages
+- **Application Insights**: Monitoring Metrics Publisher role for telemetry
 
 ### Azure Key Vault
 
 [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview) allows you to store secrets securely. Your application can access these secrets securely through the use of managed identities.
 
-### Host configuration
+### Flex Consumption vs. Consumption Plan
 
-For `appservice`, the following host configuration options are often modified:
+| Feature | Flex Consumption | Classic Consumption |
+|---------|------------------|---------------------|
+| VNet Integration | ✅ Yes | ❌ No |
+| Custom Scaling | ✅ Yes (max instances) | ❌ No |
+| Instance Memory | ✅ Configurable | ❌ Fixed |
+| Cold Start | ✅ Reduced | ⚠️ Higher |
 
-- Language runtime version
-- Exposed port from the running container (if running a web service)
-- Allowed origins for CORS (Cross-Origin Resource Sharing) protection (if running a web service backend with a frontend)
-- The run command that starts up your service
+## Cleanup
+
+```bash
+# Remove all deployed resources
+azd down
+```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
