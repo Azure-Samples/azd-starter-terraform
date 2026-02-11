@@ -18,7 +18,7 @@ This is an Azure Developer CLI (azd) starter template using **Terraform** as the
 │           ▼                     ▼                               │
 │  ┌─────────────────────────────────────────────────────┐       │
 │  │ Function App (Flex Consumption - FC1)               │       │
-│  │ - dotnet-isolated 8.0                               │       │
+│  │ - dotnet-isolated 10.0                              │       │
 │  │ - HTTP Triggers                                     │       │
 │  └─────────────────────────────────────────────────────┘       │
 │           │                                                     │
@@ -58,7 +58,7 @@ resource "azurerm_function_app_flex_consumption" "api" {
 
   # Runtime
   runtime_name    = "dotnet-isolated"
-  runtime_version = "8.0"
+  runtime_version = "10.0"
 
   # Scaling
   maximum_instance_count = 100

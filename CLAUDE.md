@@ -48,7 +48,7 @@ resource "azurerm_function_app_flex_consumption" "api" {
 
   # Runtime
   runtime_name    = "dotnet-isolated"  # or "node", "python", "java"
-  runtime_version = "8.0"
+  runtime_version = "10.0"
 
   # Scaling (Flex Consumption specific)
   maximum_instance_count = 100
