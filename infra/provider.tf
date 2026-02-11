@@ -19,6 +19,7 @@ terraform {
 # Options: "none", "core", "extended", "all" - use "none" if you lack RP registration permissions
 provider "azurerm" {
   resource_provider_registrations = "none"
+  storage_use_azuread             = true  # Use Entra ID for storage data plane operations
   features {
     key_vault {
       purge_soft_delete_on_destroy = false

@@ -1,256 +1,219 @@
-# Azure Developer CLI (azd) Terraform Starter - Flex Consumption Function
+<!--
+---
+name: Azure Functions C# HTTP Trigger using Azure Developer CLI (Terraform)
+description: This repository contains an Azure Functions HTTP trigger quickstart written in C# and deployed to Azure Functions Flex Consumption using the Azure Developer CLI (azd) with Terraform as the IaC provider. The sample uses managed identity and a virtual network to make sure deployment is secure by default.
+page_type: sample
+products:
+- azure-functions
+- azure
+- entra-id
+urlFragment: starter-http-trigger-csharp-terraform
+languages:
+- csharp
+- terraform
+- azdeveloper
+---
+-->
 
-A starter blueprint for deploying **Azure Functions with Flex Consumption** using [Azure Developer CLI](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview) (azd) and **Terraform**. This template demonstrates modern infrastructure patterns with AzureRM Provider 4.x.
+# Azure Functions C# HTTP Trigger using Azure Developer CLI (Terraform)
 
-**Migrated from**: [functions-quickstart-dotnet-azd](https://github.com/Azure-Samples/functions-quickstart-dotnet-azd) (Bicep → Terraform)
+This template repository contains an HTTP trigger reference sample for functions written in C# (isolated process mode) and deployed to Azure using the Azure Developer CLI (`azd`) with **Terraform** as the infrastructure-as-code provider. The sample uses managed identity and a virtual network to make sure deployment is secure by default.
 
-## Architecture
+> **Ported from**: [functions-quickstart-dotnet-azd](https://github.com/Azure-Samples/functions-quickstart-dotnet-azd) (Bicep → Terraform)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Resource Group (rg-{environment})                               │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────┐  ┌──────────────────┐                    │
-│  │ User Assigned    │  │ Storage Account  │                    │
-│  │ Managed Identity │  │ (deployment pkg) │                    │
-│  └────────┬─────────┘  └────────┬─────────┘                    │
-│           │                     │                               │
-│           ▼                     ▼                               │
-│  ┌─────────────────────────────────────────────────────┐       │
-│  │ Function App (Flex Consumption - FC1 SKU)           │       │
-│  │ - .NET 10 isolated worker                           │       │
-│  │ - HTTP Trigger (httpget)                            │       │
-│  └─────────────────────────────────────────────────────┘       │
-│           │                                                     │
-│           ▼                                                     │
-│  ┌──────────────────┐  ┌──────────────────┐                    │
-│  │ Log Analytics    │◄─│ Application      │                    │
-│  │ Workspace        │  │ Insights (AAD)   │                    │
-│  └──────────────────┘  └──────────────────┘                    │
-└─────────────────────────────────────────────────────────────────┘
-```
+This source code supports the article [Quickstart: Create and deploy functions to Azure Functions using the Azure Developer CLI](https://learn.microsoft.com/azure/azure-functions/create-first-function-azure-developer-cli?pivots=programming-language-dotnet).
 
-## What's Deployed
+This project is designed to run on your local computer. You can also use GitHub Codespaces:
 
-| Resource | Description |
-|----------|-------------|
-| Resource Group | Container for all resources |
-| User Assigned Managed Identity | Passwordless authentication |
-| Storage Account | Blob container for function deployment packages |
-| Log Analytics Workspace | Centralized logging |
-| Application Insights | APM with local auth disabled |
-| App Service Plan (FC1) | Flex Consumption hosting plan |
-| Function App | .NET 10 isolated HTTP trigger function |
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=836901178)
+
+This codespace is already configured with the required tools to complete this tutorial using either `azd` or Visual Studio Code. If you're working a codespace, skip down to [Prepare your local environment](#prepare-your-local-environment).
 
 ## Prerequisites
 
-### Install Required Tools
++ [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (or [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0))
++ [Azure Functions Core Tools](https://learn.microsoft.com/azure/azure-functions/functions-run-local?pivots=programming-language-csharp#install-the-azure-functions-core-tools)
++ [Terraform](https://developer.hashicorp.com/terraform/install) (>= 1.1.7)
++ To use Visual Studio to run and debug locally:
+  + [Visual Studio 2022](https://visualstudio.microsoft.com/vs/).
+  + Make sure to select the **Azure development** workload during installation.
++ To use Visual Studio Code to run and debug locally:
+  + [Visual Studio Code](https://code.visualstudio.com/)
+  + [Azure Functions extension](https://marketplace.visualstudio.com/items?itemName=ms-azuretools.vscode-azurefunctions)
 
-1. **Terraform** (>= 1.1.7)
-   ```bash
-   # macOS
-   brew install terraform
-   
-   # Windows
-   winget install Hashicorp.Terraform
-   
-   # Linux (Ubuntu/Debian)
-   sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
-   wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
-   echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-   sudo apt update && sudo apt install terraform
-   ```
+## Initialize the local project
 
-2. **.NET 10 SDK** (for building the function)
-   ```bash
-   # macOS
-   brew install dotnet@10
-   
-   # Windows
-   winget install Microsoft.DotNet.SDK.10
-   ```
+You can initialize a project from this `azd` template in one of these ways:
 
-3. **Azure CLI**
-   ```bash
-   # macOS
-   brew install azure-cli
-   
-   # Windows
-   winget install Microsoft.AzureCLI
-   
-   # Linux
-   curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-   ```
++ Use this `azd init` command from an empty local (root) folder:
 
-4. **Azure Developer CLI (azd)**
-   ```bash
-   # macOS
-   brew install azure-dev
-   
-   # Windows
-   winget install Microsoft.Azd
-   
-   # Linux
-   curl -fsSL https://aka.ms/install-azd.sh | bash
-   ```
+    ```shell
+    azd init --template functions-quickstart-dotnet-azd-terraform
+    ```
 
-### Configure Azure Authentication
+    Supply an environment name, such as `flexquickstart` when prompted. In `azd`, the environment is used to maintain a unique deployment context for your app.
 
-```bash
-# Login to Azure CLI (required for Terraform auth)
-az login
++ Clone the GitHub template repository locally using the `git clone` command:
 
-# Set your subscription
-az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
+    ```shell
+    git clone https://github.com/Azure-Samples/functions-quickstart-dotnet-azd-terraform.git
+    cd functions-quickstart-dotnet-azd-terraform
+    ```
 
-# Verify current subscription
-az account show --query "{name:name, id:id, tenantId:tenantId}"
+    You can also clone the repository from your own fork in GitHub.
+
+## Prepare your local environment
+
+Navigate to the `http` app folder and create a file in that folder named _local.settings.json_ that contains this JSON data:
+
+```json
+{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated"
+    }
+}
 ```
 
-## Provider Configuration
+## Run your app from the terminal
 
-This template uses **AzureRM Provider 4.x** with the following key features:
+1. From the `http` folder, run this command to start the Functions host locally:
 
-- **Terraform**: >= 1.1.7
-- **AzureRM Provider**: ~>4.21
-- **AzureCAF Provider**: ~>1.2.24 (for resource naming)
+    ```shell
+    func start
+    ```
 
-### Key 4.x Changes from 3.x
+1. From your HTTP test tool in a new terminal (or from your browser), call the HTTP GET endpoint: <http://localhost:7071/api/httpget>
 
-| Setting (3.x) | Setting (4.x) |
-|---------------|---------------|
-| `skip_provider_registration = true` | `resource_provider_registrations = "none"` |
+1. Test the HTTP POST trigger with a payload using your favorite secure HTTP test tool.
 
-For full migration guide, see: [AzureRM 4.0 Upgrade Guide](https://github.com/hashicorp/terraform-provider-azurerm/blob/main/website/docs/guides/4.0-upgrade-guide.html.markdown)
+    **Cmd\bash**
 
-## Documentation References
+    This example runs from the `http` folder and uses the `curl` tool with payload data from the [`testdata.json`](./http/testdata.json) project file:
 
-- [Azure Functions Flex Consumption](https://learn.microsoft.com/en-us/azure/azure-functions/flex-consumption-plan)
-- [azurerm_function_app_flex_consumption](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/function_app_flex_consumption)
-- [Azure Developer CLI Overview](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/overview)
-- [Terraform AzureRM Provider Docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-- [AzureRM 4.x Upgrade Guide](https://github.com/hashicorp/terraform-provider-azurerm/blob/main/website/docs/guides/4.0-upgrade-guide.html.markdown)
+    ```shell
+    curl -i http://localhost:7071/api/httppost -H "Content-Type: text/json" -d @testdata.json
+    ```
 
-## Project Structure
+    **PowerShell**
 
+    You can also use this `Invoke-RestMethod` cmdlet in PowerShell from the `http` folder:
+
+    ```powershell
+    Invoke-RestMethod -Uri http://localhost:7071/api/httppost -Method Post -ContentType "application/json" -InFile "testdata.json"
+    ```
+
+1. When you're done, press Ctrl+C in the terminal window to stop the `func.exe` host process.
+
+## Run your app using Visual Studio Code
+
+1. Open the `http` app folder in a new terminal.
+1. Run the `code .` code command to open the project in Visual Studio Code.
+1. In the command palette (F1), type `Azurite: Start`, which enables debugging without warnings.
+1. Press **Run/Debug (F5)** to run in the debugger. Select **Debug anyway** if prompted about local emulator not running.
+1. Send GET and POST requests to the `httpget` and `httppost` endpoints respectively using your HTTP test tool (or browser for `httpget`). If you have the [RestClient](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) extension installed, you can execute requests directly from the [`test.http`](./http/test.http) project file.
+
+## Run your app using Visual Studio
+
+1. Open the `http.sln` solution file in Visual Studio.
+1. Press **Run/F5** to run in the debugger. Make a note of the `localhost` URL endpoints, including the port, which might not be `7071`.
+1. Open the [`test.http`](./http/test.http) project file, update the port on the `localhost` URL (if needed), and then use the built-in HTTP client to call the `httpget` and `httppost` endpoints.
+
+## Source Code
+
+The function code for the `httpget` and `httppost` endpoints are defined in [`httpGetFunction.cs`](./http/httpGetFunction.cs) and [`httpPostBodyFunction.cs`](./http/httpPostBodyFunction.cs), respectively. The `Function` attribute applied to the async `Run` method sets the name of the function endpoint.
+
+This code shows an HTTP GET (webhook):  
+
+```csharp
+[Function("httpget")]
+public IActionResult Run([HttpTrigger(AuthorizationLevel.Function, "get")]
+    HttpRequest req,
+    string name)
+{
+    var returnValue = string.IsNullOrEmpty(name)
+        ? "Hello, World."
+        : $"Hello, {name}.";
+
+    _logger.LogInformation($"C# HTTP trigger function processed a request for {returnValue}.");
+
+    return new OkObjectResult(returnValue);
+}
 ```
-├── azure.yaml              # AZD project configuration
-├── http/                   # Function app source code
-│   ├── http.csproj         # .NET 10 project file
-│   ├── Program.cs          # Host configuration
-│   ├── httpGetFunction.cs  # HTTP trigger function
-│   └── host.json           # Function host settings
-├── infra/
-│   ├── provider.tf         # Provider configuration (azurerm ~>4.21)
-│   ├── main.tf             # All infrastructure resources
-│   ├── variables.tf        # Input variables
-│   └── output.tf           # Output values (for AZD)
-└── .devcontainer/          # Dev container with tools pre-installed
+
+This code shows the HTTP POST that received a JSON formatted `person` object in the request body and returns a message using the values in the payload:
+
+```csharp
+[Function("httppost")]
+public IActionResult Run([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req,
+    [FromBody] Person person)
+{
+    _logger.LogInformation($"C# HTTP POST trigger function processed a request for url {req.Body}");
+
+    if (string.IsNullOrEmpty(person.Name) | string.IsNullOrEmpty(person.Age.ToString()) | person.Age == 0)
+    {
+        _logger.LogInformation("C# HTTP POST trigger function processed a request with no name/age provided.");
+        return new BadRequestObjectResult("Please provide both name and age in the request body.");
+    }
+
+    var returnValue = $"Hello, {person.Name}! You are {person.Age} years old.";
+    
+    _logger.LogInformation($"C# HTTP POST trigger function processed a request for {person.Name} who is {person.Age} years old.");
+    return new OkObjectResult(returnValue);
+}
 ```
 
-The following assets have been provided:
+## Deploy to Azure
 
-- **Function App Code** in `http/` - A .NET 10 isolated worker HTTP trigger function
-- **Infrastructure-as-code** in `infra/` - Terraform configuration for Flex Consumption Function App
-- **Dev Container** in `.devcontainer/` - Pre-configured development environment
+Run this command to provision the function app, with any required Azure resources, and deploy your code:
 
-## Quick Start
-
-```bash
-# Login to Azure
-az login
-az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
-
-# Deploy everything with AZD
+```shell
 azd up
-
-# Or step-by-step:
-azd provision  # Create infrastructure
-azd deploy     # Deploy function code
 ```
 
-## Test the Function
+You're prompted to supply these required deployment parameters:
 
-After deployment, test your function:
+| Parameter | Description |
+| ---- | ---- |
+| _Environment name_ | An environment that's used to maintain a unique deployment context for your app. You won't be prompted if you created the local project using `azd init`.|
+| _Azure subscription_ | Subscription in which your resources are created.|
+| _Azure location_ | Azure region in which to create the resource group that contains the new Azure resources. Only regions that currently support the Flex Consumption plan are shown.|
 
-```bash
-# Get the function URL
-azd env get-values | grep AZURE_FUNCTION_NAME
+After publish completes successfully, `azd` provides you with the URL endpoints of your new functions, but without the function key values required to access the endpoints. To learn how to obtain these same endpoints along with the required function keys, see [Invoke the function on Azure](https://learn.microsoft.com/azure/azure-functions/create-first-function-azure-developer-cli?pivots=programming-language-dotnet#invoke-the-function-on-azure) in the companion article [Quickstart: Create and deploy functions to Azure Functions using the Azure Developer CLI](https://learn.microsoft.com/azure/azure-functions/create-first-function-azure-developer-cli?pivots=programming-language-dotnet).
 
-# Test the HTTP endpoint
-curl "https://<function-name>.azurewebsites.net/api/httpget?name=World"
-```
+## Redeploy your code
 
-## Key Features
+You can run the `azd up` command as many times as you need to both provision your Azure resources and deploy code updates to your function app.
 
-### Flex Consumption Plan
-- **Automatic scaling** from 0 to 100 instances
-- **VNet integration** support (optional)
-- **Instance memory**: 2048 MB
-- **Pay-per-use** billing
+>[!NOTE]
+>Deployed code files are always overwritten by the latest deployment package.
 
-### Managed Identity Authentication
-- User Assigned Managed Identity for all Azure access
-- No connection strings or access keys
-- RBAC roles: Storage Blob Data Owner, Monitoring Metrics Publisher
+## Clean up resources
 
-### Application Insights
-- Local authentication disabled (AAD only)
-- Connected to Log Analytics workspace
-- Automatic telemetry collection
+When you're done working with your function app and related resources, you can use this command to delete the function app and its related resources from Azure and avoid incurring any further costs:
 
-## Customization
-
-### Change Runtime
-
-Edit `infra/main.tf`:
-```hcl
-runtime_name    = "node"      # or "python", "java", "dotnet-isolated"
-runtime_version = "20"        # version appropriate for runtime
-```
-
-### Adjust Scaling
-
-```hcl
-maximum_instance_count = 100  # Max instances
-instance_memory_in_mb  = 2048 # Memory per instance
-```
-
-### Enable VNet Integration
-
-VNet integration is not enabled by default. To add it, you would need to:
-1. Create a Virtual Network and subnet
-2. Add `virtual_network_subnet_id` to the function app resource
-
-## Additional Details
-
-### Managed Identities
-
-This template uses a **User Assigned Managed Identity** for passwordless authentication to Azure services:
-
-- **Storage Account**: Storage Blob Data Owner role for deployment packages
-- **Application Insights**: Monitoring Metrics Publisher role for telemetry
-
-### Azure Key Vault
-
-[Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general/overview) allows you to store secrets securely. Your application can access these secrets securely through the use of managed identities.
-
-### Flex Consumption vs. Consumption Plan
-
-| Feature | Flex Consumption | Classic Consumption |
-|---------|------------------|---------------------|
-| VNet Integration | ✅ Yes | ❌ No |
-| Custom Scaling | ✅ Yes (max instances) | ❌ No |
-| Instance Memory | ✅ Configurable | ❌ Fixed |
-| Cold Start | ✅ Reduced | ⚠️ Higher |
-
-## Cleanup
-
-```bash
-# Remove all deployed resources
+```shell
 azd down
 ```
 
-## Contributing
+## Infrastructure as Code (Terraform)
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+This template uses **Terraform** with AzureRM Provider 4.x instead of Bicep. The infrastructure configuration is in the `infra/` folder:
+
+| File | Description |
+| ---- | ---- |
+| `provider.tf` | Provider configuration (AzureRM ~>4.21, AzureCAF ~>1.2.24) |
+| `main.tf` | All Azure resources (Resource Group, Storage, Identity, Function App, etc.) |
+| `variables.tf` | Input variables (`location`, `environment_name`, `principal_id`) |
+| `output.tf` | Output values consumed by `azd` |
+| `main.tfvars.json` | Default variable values |
+
+### Key Differences from Bicep Version
+
+| Aspect | Bicep (source) | Terraform (this repo) |
+| ------ | -------------- | --------------------- |
+| IaC Provider | Bicep/ARM | Terraform (AzureRM 4.x) |
+| Resource Naming | Bicep abbreviations | AzureCAF provider |
+| Function App Resource | `Microsoft.Web/sites` | `azurerm_function_app_flex_consumption` |
+| `azure.yaml` | Default (Bicep) | `infra: provider: terraform` |

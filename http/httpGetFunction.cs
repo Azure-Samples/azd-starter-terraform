@@ -15,7 +15,7 @@ namespace Company.Function
         }
 
         [Function("httpget")]
-        public IActionResult Run([HttpTrigger(AuthorizationLevel.Function, "get")]
+        public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get")]
           HttpRequest req,
           string name)
         {

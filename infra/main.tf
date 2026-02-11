@@ -63,14 +63,25 @@ resource "azurerm_storage_account" "function_storage" {
   account_replication_type        = "LRS"
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = false # Disable local auth, use managed identity
+  default_to_oauth_authentication = true  # Use Entra ID by default
   min_tls_version                 = "TLS1_2"
   tags                            = local.tags
+}
+
+# RBAC for deploying user - MUST be created before container when using Entra ID auth
+resource "azurerm_role_assignment" "storage_blob_data_owner_deployer" {
+  scope                = azurerm_storage_account.function_storage.id
+  role_definition_name = "Storage Blob Data Owner"
+  principal_id         = data.azurerm_client_config.current.object_id
+  principal_type       = "User"
 }
 
 resource "azurerm_storage_container" "deployment_package" {
   name                  = local.deployment_storage_container
   storage_account_id    = azurerm_storage_account.function_storage.id
   container_access_type = "private"
+
+  depends_on = [azurerm_role_assignment.storage_blob_data_owner_deployer]
 }
 
 # Log Analytics Workspace
