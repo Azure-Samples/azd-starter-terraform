@@ -5,8 +5,8 @@ locals {
 terraform {
   required_providers {
     azurerm = {
-      version = "~>3.97.1"
       source  = "hashicorp/azurerm"
+      version = "~>4.21"
     }
     azurecaf = {
       source  = "aztfmod/azurecaf"
